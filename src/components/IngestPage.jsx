@@ -1,19 +1,14 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
-  Type, FileText, Image, Video,
+  FileText,
   Upload, X, CheckCircle2, AlertCircle,
   ChevronDown, RotateCcw, Copy, CheckCheck,
   Database, Layers,
 } from 'lucide-react';
 import { ingest } from '../api/nexvec';
 
-const MODES = [
-  { id: 'pdf',   label: 'PDF',   Icon: FileText, iconColor: '#dc2626', iconBg: '#fef2f2', accept: { 'application/pdf': ['.pdf'] },                                          hint: '.pdf files' },
-  { id: 'text',  label: 'Text',  Icon: Type,     iconColor: '#6366f1', iconBg: '#eef2ff', accept: null,                                                                      hint: 'Plain text' },
-  { id: 'image', label: 'Image', Icon: Image,    iconColor: '#0891b2', iconBg: '#ecfeff', accept: { 'image/*': ['.jpg','.jpeg','.png','.webp','.gif','.bmp'] },               hint: 'JPG, PNG, WEBP' },
-  { id: 'video', label: 'Video', Icon: Video,    iconColor: '#7c3aed', iconBg: '#f5f3ff', accept: { 'video/*': ['.mp4','.mov','.avi','.mkv','.webm'] },                       hint: 'MP4, MOV, MKV' },
-];
+const PDF_MODE = { id: 'pdf', label: 'PDF', Icon: FileText, iconColor: '#dc2626', iconBg: '#fef2f2', accept: { 'application/pdf': ['.pdf'] }, hint: '.pdf files' };
 
 const STAGES = ['Uploading', 'Parsing', 'Embedding', 'Storing'];
 
@@ -57,9 +52,7 @@ function DropZone({ mode, file, setFile, disabled }) {
 }
 
 export default function IngestPage() {
-  const [modeId, setModeId]       = useState('pdf');
-  const mode                      = MODES.find(m => m.id === modeId);
-  const [text, setText]           = useState('');
+  const mode                      = PDF_MODE;
   const [file, setFile]           = useState(null);
   const [kbName, setKbName]       = useState('');
   const [showAdv, setShowAdv]     = useState(false);
@@ -74,13 +67,7 @@ export default function IngestPage() {
   const [error, setError]         = useState('');
   const [copied, setCopied]       = useState(false);
 
-  const switchMode = (id) => {
-    if (status === 'loading') return;
-    setModeId(id); setFile(null); setText('');
-    setStatus(null); setError(''); setResponse(null);
-  };
-
-  const canSubmit = modeId === 'text' ? text.trim().length > 0 : file !== null;
+  const canSubmit = file !== null;
   const busy = status === 'loading';
 
   const submit = async () => {
@@ -89,13 +76,8 @@ export default function IngestPage() {
     let s = 0;
     const t = setInterval(() => { s++; if (s < STAGES.length) setStage(s); else clearInterval(t); }, 750);
     try {
-      let fileToSend = file;
-      if (modeId === 'text') {
-        const blob = new Blob([text.trim()], { type: 'text/plain' });
-        fileToSend = new File([blob], 'content.txt', { type: 'text/plain' });
-      }
       const res = await ingest({
-        file: fileToSend,
+        file,
         kb_name:           kbName    || undefined,
         chunking_strategy: strategy  || undefined,
         chunk_size:        chunkSize ? +chunkSize : undefined,
@@ -110,7 +92,7 @@ export default function IngestPage() {
     }
   };
 
-  const reset = () => { setStatus(null); setError(''); setResponse(null); setStage(0); setFile(null); setText(''); };
+  const reset = () => { setStatus(null); setError(''); setResponse(null); setStage(0); setFile(null); };
 
   const copyResponse = () => {
     navigator.clipboard.writeText(typeof response === 'string' ? response : JSON.stringify(response, null, 2));
@@ -129,40 +111,18 @@ export default function IngestPage() {
           <span className="grad">Ingest Your Content</span>
         </h1>
         <p style={{ fontSize:14, color:'rgba(255,255,255,0.28)', maxWidth:420, margin:'0 auto', lineHeight:1.7 }}>
-          Embed text, PDFs, images, or videos into your custom vector knowledge base.
+          Upload a PDF to embed it into your custom vector knowledge base.
         </p>
       </div>
 
       {/* Card */}
       <div className="card fade-up" style={{ padding:'28px' }}>
 
-        {/* Mode tabs */}
-        <div className="mode-tabs" style={{ marginBottom:24 }}>
-          {MODES.map(m => (
-            <button key={m.id} className={`mode-tab${modeId===m.id?' active':''}`}
-              onClick={() => switchMode(m.id)} disabled={busy} title={m.hint}>
-              <m.Icon size={15} />{m.label}
-            </button>
-          ))}
-        </div>
-
         {/* Input */}
-        {modeId === 'text' ? (
-          <div>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
-              <label className="field-label" style={{ margin:0 }}>Text Content</label>
-              {text.length > 0 && <span style={{ fontSize:11.5, color:'#9ca3af' }}>{text.length.toLocaleString()} chars</span>}
-            </div>
-            <textarea className="field" rows={7}
-              placeholder="Paste or type the content you want to embed…"
-              value={text} onChange={e => setText(e.target.value)} disabled={busy} />
-          </div>
-        ) : (
-          <div>
-            <label className="field-label" style={{ marginBottom:8 }}>{mode.label} File</label>
-            <DropZone mode={mode} file={file} setFile={setFile} disabled={busy} />
-          </div>
-        )}
+        <div>
+          <label className="field-label" style={{ marginBottom:8 }}>PDF File</label>
+          <DropZone mode={mode} file={file} setFile={setFile} disabled={busy} />
+        </div>
 
         {/* KB Name */}
         <div style={{ marginTop:20 }}>
